@@ -231,3 +231,29 @@ ios_src = ios_src.replace(
 )
 ios_path.write_text(ios_src)
 print("Modern libogc Shared/IOS compatibility fix applied.")
+
+
+# libogc no longer exports __exception_closeall. Mirror the current
+# Priiloader source behavior for the three launch paths.
+main_src_path = Path("priiloader/src/priiloader/source/main.cpp")
+main_src = main_src_path.read_text()
+if "__exception_closeall();" not in main_src:
+    raise SystemExit("Could not find legacy __exception_closeall call in main.cpp")
+main_src = main_src.replace("__exception_closeall();", "IRQ_Disable();", 1)
+main_src_path.write_text(main_src)
+
+sm_path = Path("priiloader/src/priiloader/source/SystemMenu.cpp")
+sm_src = sm_path.read_text()
+if "__exception_closeall();" not in sm_src:
+    raise SystemExit("Could not find legacy __exception_closeall call in SystemMenu.cpp")
+sm_src = sm_src.replace("__exception_closeall();", "IRQ_Disable();", 1)
+sm_path.write_text(sm_src)
+
+disc_path = Path("priiloader/src/priiloader/source/DiscContent.cpp")
+disc_src = disc_path.read_text()
+if "__exception_closeall();" not in disc_src:
+    raise SystemExit("Could not find legacy __exception_closeall call in DiscContent.cpp")
+disc_src = disc_src.replace("\t__exception_closeall();\n\t_CPU_ISR_Disable(level);", "\t_CPU_ISR_Disable(level);", 1)
+disc_path.write_text(disc_src)
+
+print("Removed obsolete __exception_closeall dependency.")
