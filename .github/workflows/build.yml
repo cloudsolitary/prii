@@ -2,6 +2,8 @@ name: Build Priiloader 0.10.0 Keyboard Installer
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
   build:
