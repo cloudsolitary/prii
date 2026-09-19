@@ -1,0 +1,162 @@
+diff --git a/src/Installer/source/main.cpp b/src/Installer/source/main.cpp
+index 6739c6d..0000000 100644
+--- a/src/Installer/source/main.cpp
++++ b/src/Installer/source/main.cpp
+@@ -36,6 +36,8 @@
+ #include <unistd.h>
+ #include <gccore.h>
+ #include <wiiuse/wpad.h>
++#include <ogc/usb.h>
++#include <wiikeyboard/usbkeyboard.h>
+
+ #include <ogc/machine/processor.h>
+ #include <ogc/machine/asm.h>
+@@ -84,6 +86,58 @@ typedef struct init_states {
+ 	s8 AHBPROT;
+ } init_states;
+
++/*
++ * USB keyboard support for the Priiloader 0.10.0 installer.
++ *
++ * ENTER / keypad ENTER = install or confirm (A / +)
++ * ESC / SPACE          = cancel / go back (B / HOME)
++ *
++ * Removal is intentionally NOT mapped to the keyboard to reduce the chance
++ * of accidentally removing Priiloader.
++ */
++enum
++{
++	KBD_INSTALL = (1 << 0),
++	KBD_CANCEL  = (1 << 1)
++};
++
++static volatile u32 _kbd_down = 0;
++static bool _kbd_initialized = false;
++
++static void KBEventHandler(USBKeyboard_event event)
++{
++	if(event.type != USBKEYBOARD_PRESSED)
++		return;
++
++	switch(event.keyCode)
++	{
++		case 0x28: // Enter
++		case 0x58: // Keypad Enter
++			_kbd_down |= KBD_INSTALL;
++			break;
++		case 0x29: // Escape
++		case 0x2C: // Space
++			_kbd_down |= KBD_CANCEL;
++			break;
++		default:
++			break;
++	}
++}
++
++static void KeyboardInit()
++{
++	if(_kbd_initialized)
++		return;
++
++	USB_Initialize();
++	USBKeyboard_Initialize();
++	_kbd_initialized = true;
++}
++
++static void KeyboardPoll()
++{
++	KeyboardInit();
++	if(!USBKeyboard_IsConnected())
++		USBKeyboard_Open(KBEventHandler);
++	USBKeyboard_Scan();
++	usleep(1000);
++}
++
++static u32 KeyboardButtonsDown()
++{
++	u32 pressed = _kbd_down;
++	_kbd_down = 0;
++	return pressed;
++}
++
+ void sleepx (int seconds)
+ {
+ 	time_t start;
+@@ -103,12 +157,15 @@ bool UserYesNoStop()
+ 	while(1)
+ 	{
+ 		WPAD_ScanPads();
+ 		PAD_ScanPads();
++		KeyboardPoll();
+ 		pDown = WPAD_ButtonsDown(0);
+ 		GCpDown = PAD_ButtonsDown(0);
+-		if (pDown & WPAD_BUTTON_A || GCpDown & PAD_BUTTON_A)
++		u32 kDown = KeyboardButtonsDown();
++		if (pDown & WPAD_BUTTON_A || GCpDown & PAD_BUTTON_A || (kDown & KBD_INSTALL))
+ 		{
+ 			return true;
+ 		}
+-		if (pDown & WPAD_BUTTON_B || GCpDown & PAD_BUTTON_B)
++		if (pDown & WPAD_BUTTON_B || GCpDown & PAD_BUTTON_B || (kDown & KBD_CANCEL))
+ 		{
+ 			return false;
+ 		}
+@@ -738,13 +795,15 @@ int main(int argc, char **argv)
+
+ 	WPAD_Init();
+ 	PAD_Init();
++	KeyboardInit();
+ 	sleepx(5);
+
+-	printf("\r\t         Press (+/A) to install or update Priiloader\r\n");
++	printf("\r\t   Press (+/A/ENTER) to install or update Priiloader\r\n");
+ 	printf("\t    Press (-/Y) to remove Priiloader and restore system menu\r\n");
+ 	if( (ios_patched < 1) && (IOS_GetVersion() != 36 ) )
+ 		printf("\t         Hold Down (B) with any above options to use IOS36\r\n");
+-	printf("\t    Press (HOME/Start) to chicken out and quit the installer!\r\n\r\n");
++	printf("\t Press (HOME/Start/ESC) to chicken out and quit the installer!\r\n");
++	printf("\t        USB keyboard: ENTER=install, ESC/SPACE=cancel\r\n\r\n");
+ 	printf("\t                         Enjoy! DacoTaco \r\n");
+ 	while(1)
+ 	{
+ 		WPAD_ScanPads();
+ 		PAD_ScanPads();
++		KeyboardPoll();
+ 		u16 pDown = WPAD_ButtonsDown(0);
+ 		u16 GCpDown = PAD_ButtonsDown(0);
+ 		u16 pHeld = WPAD_ButtonsHeld(0);
+ 		u16 GCpHeld = PAD_ButtonsHeld(0);
++		u32 kDown = KeyboardButtonsDown();
+ 		if ( (pHeld & WPAD_BUTTON_B || GCpHeld & PAD_BUTTON_B) && ( (pDown & WPAD_BUTTON_PLUS || GCpDown & PAD_BUTTON_A) || (pDown & WPAD_BUTTON_MINUS || GCpDown & PAD_BUTTON_Y ) ) )
+ 		{
+ 			if((ios_patched < 1) && (IOS_GetVersion() != 36 ) )
+@@ -766,7 +825,7 @@ int main(int argc, char **argv)
+     	}
+
+-		if (pDown & WPAD_BUTTON_PLUS || GCpDown & PAD_BUTTON_A)
++		if (pDown & WPAD_BUTTON_PLUS || GCpDown & PAD_BUTTON_A || (kDown & KBD_INSTALL))
+ 		{
+ 			//install Priiloader
+ 			ClearScreen();
+@@ -826,7 +885,7 @@ int main(int argc, char **argv)
+ 				abort("Removal done.\r\n");
+ 			}
+ 		}
+-		else if ( GCpDown & PAD_BUTTON_START || pDown & WPAD_BUTTON_HOME) 
++		else if ( GCpDown & PAD_BUTTON_START || pDown & WPAD_BUTTON_HOME || (kDown & KBD_CANCEL))
+ 		{
+ 			VIDEO_ClearFrameBuffer( rmode, xfb, COLOR_BLACK);
+ 			ClearScreen();
+diff --git a/src/Installer/Makefile b/src/Installer/Makefile
+index 4576250..0000000 100644
+--- a/src/Installer/Makefile
++++ b/src/Installer/Makefile
+@@ -43,7 +43,7 @@ LDFLAGS	=	-g $(MACHDEP) -Wl,-Map,$(notdir $@).map,--section-start,.init=0x80005
+ #---------------------------------------------------------------------------------
+ # any extra libraries we wish to link with the project
+ #---------------------------------------------------------------------------------
+-LIBS	:=	-ldb -lwiiuse -lbte -logc -lfat
++LIBS	:=	-lwiikeyboard -ldb -lwiiuse -lbte -logc -lfat
+
+ #---------------------------------------------------------------------------------
+ # list of directories containing libraries, this must be the top level containing
