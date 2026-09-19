@@ -26,7 +26,7 @@ jobs:
 
       - name: Build installer
         run: |
-          make -C priiloader/src/Installer -j2
+          make -C priiloader/src/Installer
 
       - name: Prepare Homebrew Channel folder
         run: |
