@@ -28,14 +28,15 @@ jobs:
         run: |
           make -C priiloader
 
-      - name: Prepare Homebrew Channel folder
+      - name: Prepare recovery and Homebrew Channel files
         run: |
           mkdir -p output/priiloader-keyboard
           cp priiloader/src/Installer/Installer.dol output/priiloader-keyboard/boot.dol
+          cp priiloader/src/Installer/Installer.elf output/priiloader-keyboard/boot.elf
           cp priiloader/src/Installer/META.XML output/priiloader-keyboard/meta.xml
           cp priiloader/src/Installer/icon.png output/priiloader-keyboard/icon.png
 
-      - name: Upload boot.dol
+      - name: Upload installer files
         uses: actions/upload-artifact@v4
         with:
           name: priiloader-0.10.0-keyboard-installer
