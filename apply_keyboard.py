@@ -217,3 +217,17 @@ if old_titles_call not in titles_src:
 titles_src = titles_src.replace(old_titles_call, "ES_GetTMDView(title_list[i], rTMD, tmd_size)", 1)
 titles_path.write_text(titles_src)
 print("Modern libogc titles compatibility fix applied.")
+
+
+ios_path = Path("priiloader/src/Shared/IOS.cpp")
+ios_src = ios_path.read_text()
+old_ios_call = "ES_GetTMDView(0x0000000100000000ULL | ios_number, (u8*)ios_tmd, tmd_size)"
+if old_ios_call not in ios_src:
+    raise SystemExit("Could not find legacy ES_GetTMDView call in Shared/IOS.cpp")
+ios_src = ios_src.replace(
+    old_ios_call,
+    "ES_GetTMDView(0x0000000100000000ULL | ios_number, ios_tmd, tmd_size)",
+    1
+)
+ios_path.write_text(ios_src)
+print("Modern libogc Shared/IOS compatibility fix applied.")
