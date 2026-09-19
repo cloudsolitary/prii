@@ -207,3 +207,13 @@ system_menu = system_menu.replace(old_iv, "static u8 vwii_ancast_iv[0x10]", 1)
 
 system_menu_path.write_text(system_menu)
 print("Modern libogc SystemMenu compatibility fixes applied.")
+
+
+titles_path = Path("priiloader/src/priiloader/source/titles.cpp")
+titles_src = titles_path.read_text()
+old_titles_call = "ES_GetTMDView(title_list[i], (u8*)rTMD, tmd_size)"
+if old_titles_call not in titles_src:
+    raise SystemExit("Could not find legacy ES_GetTMDView call in titles.cpp")
+titles_src = titles_src.replace(old_titles_call, "ES_GetTMDView(title_list[i], rTMD, tmd_size)", 1)
+titles_path.write_text(titles_src)
+print("Modern libogc titles compatibility fix applied.")
