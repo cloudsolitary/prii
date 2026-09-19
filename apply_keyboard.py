@@ -189,3 +189,21 @@ if old_loader_flags not in loader_mk:
 loader_mk = loader_mk.replace(old_loader_flags, new_loader_flags, 1)
 loader_make_path.write_text(loader_mk)
 print("Modern devkitPPC Wii target flags added to loader.")
+
+
+# Compatibility fixes for libogc versions current in 2026.
+system_menu_path = Path("priiloader/src/priiloader/source/SystemMenu.cpp")
+system_menu = system_menu_path.read_text()
+
+old_tmd_call = "ES_GetTMDView(TitleID, (u8*)rTMD, tmd_size)"
+if system_menu.count(old_tmd_call) != 2:
+    raise SystemExit("Unexpected number of legacy ES_GetTMDView calls")
+system_menu = system_menu.replace(old_tmd_call, "ES_GetTMDView(TitleID, rTMD, tmd_size)")
+
+old_iv = "static const u8 vwii_ancast_iv[0x10]"
+if old_iv not in system_menu:
+    raise SystemExit("Could not find legacy vWii AES IV declaration")
+system_menu = system_menu.replace(old_iv, "static u8 vwii_ancast_iv[0x10]", 1)
+
+system_menu_path.write_text(system_menu)
+print("Modern libogc SystemMenu compatibility fixes applied.")
