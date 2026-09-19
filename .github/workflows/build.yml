@@ -1,0 +1,40 @@
+name: Build Priiloader 0.10.0 Keyboard Installer
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitppc:latest
+
+    steps:
+      - name: Checkout this builder repo
+        uses: actions/checkout@v4
+
+      - name: Clone official Priiloader 0.10.0 source
+        run: |
+          git clone --depth 1 --branch 0.10.0 --recursive \
+            https://github.com/DacoTaco/priiloader.git priiloader
+
+      - name: Apply USB keyboard patch
+        run: |
+          git -C priiloader apply ../priiloader_keyboard.patch
+
+      - name: Build installer
+        run: |
+          make -C priiloader/src/Installer -j2
+
+      - name: Prepare Homebrew Channel folder
+        run: |
+          mkdir -p output/priiloader-keyboard
+          cp priiloader/src/Installer/Installer.dol output/priiloader-keyboard/boot.dol
+          cp priiloader/src/Installer/META.XML output/priiloader-keyboard/meta.xml
+          cp priiloader/src/Installer/icon.png output/priiloader-keyboard/icon.png
+
+      - name: Upload boot.dol
+        uses: actions/upload-artifact@v4
+        with:
+          name: priiloader-0.10.0-keyboard-installer
+          path: output/priiloader-keyboard/
