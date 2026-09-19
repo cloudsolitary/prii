@@ -175,3 +175,17 @@ mk = mk.replace(old_libs, new_libs, 1)
 make_path.write_text(mk)
 
 print("Keyboard support injected successfully.")
+
+
+# Priiloader 0.10.0's loader Makefile predates newer devkitPPC/libogc
+# platform selection. Current wii_rules exposes the Wii target flags in
+# $(MACHDEP), so make sure the tiny loader is compiled with them too.
+loader_make_path = Path("priiloader/src/loader/Makefile")
+loader_mk = loader_make_path.read_text()
+old_loader_flags = "CFLAGS\t\t=\t-Os $(INCLUDE) -save-temps -fno-asynchronous-unwind-tables -fno-builtin"
+new_loader_flags = "CFLAGS\t\t=\t-Os $(MACHDEP) $(INCLUDE) -save-temps -fno-asynchronous-unwind-tables -fno-builtin"
+if old_loader_flags not in loader_mk:
+    raise SystemExit("Could not find expected CFLAGS line in loader Makefile")
+loader_mk = loader_mk.replace(old_loader_flags, new_loader_flags, 1)
+loader_make_path.write_text(loader_mk)
+print("Modern devkitPPC Wii target flags added to loader.")
